@@ -1,0 +1,26 @@
+<?php
+
+namespace Gigalog\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Gigalog\Models\Gigalog;
+
+class GigalogResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        /** @var Gigalog $model */
+        $model = $this->resource;
+
+        return [
+            'id' => $this->id,
+            'group' => $this->group,
+            'message' => $model->getEvent()->getMessage(),
+            'causer' => $this->whenLoaded('causer', $this->causer),
+            'subject' => $this->whenLoaded('subject', $this->subject),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
+    }
+}

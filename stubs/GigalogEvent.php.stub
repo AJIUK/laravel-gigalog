@@ -1,0 +1,13 @@
+<?php
+
+namespace {{ namespace }};
+
+use Gigalog\Abstracts\GigalogEvent;
+
+class {{ class }} extends GigalogEvent
+{
+    public function getMessage(): string
+    {
+        return 'New log';
+    }
+}
