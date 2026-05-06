@@ -2,6 +2,7 @@
 
 namespace Gigalog\Abstracts;
 
+use Gigalog\Contracts\GigalogGroupEnum;
 use Gigalog\Models\Gigalog;
 use Gigalog\Support\GigalogAction;
 use Gigalog\Support\GigalogEager;
@@ -43,12 +44,11 @@ abstract class GigalogEvent
     final public static function createGigalog(
         Model $subject,
         ?Model $causer = null,
-        ?array $data = null,
-        ?string $group = null,
+        ?array $data = null
     ): self
     {
         $service = app(\Gigalog\Services\GigalogService::class);
-        return new static($service->create(static::class, $subject, $causer, $data, $group));
+        return new static($service->create(static::class, $subject, $causer, $data));
     }
 
     /**
@@ -76,6 +76,14 @@ abstract class GigalogEvent
      * Получить действие события
      */
     public function getAction(): ?GigalogAction
+    {
+        return null;
+    }
+
+    /**
+     * Получить группу события
+     */
+    public static function getGroup(): ?GigalogGroupEnum
     {
         return null;
     }

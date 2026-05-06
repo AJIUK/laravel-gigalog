@@ -1,6 +1,6 @@
 <?php
 
-namespace Gigalog\Resources;
+namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -13,12 +13,15 @@ class GigalogResource extends JsonResource
         /** @var Gigalog $model */
         $model = $this->resource;
 
+        $group = $model->getEvent()?->getGroup();
+
         return [
             'id' => $this->id,
-            'group' => $this->group,
+            'group' => $group ? [
+                'name' => $group->getName(),
+                'code' => $group->getCode(),
+            ] : null,
             'message' => $model->getEvent()->getMessage(),
-            'causer' => $this->whenLoaded('causer', $this->causer),
-            'subject' => $this->whenLoaded('subject', $this->subject),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

@@ -90,10 +90,11 @@ php artisan make:gigalog OrderCreatedGigalogEvent
 - `getTitle(): ?string` — короткий заголовок события (по умолчанию `null`)
 - `getAction(): ?Gigalog\Support\GigalogAction` — действие (кнопка/ссылка) для UI (по умолчанию `null`)
 - `getEagerBag(): Gigalog\Support\GigalogEagerBag` — объявление зависимостей для батч-загрузки связанных данных (по умолчанию пустой `GigalogEagerBag`)
+- `getGroup(): ?Gigalog\Contracts\GigalogGroupEnum` — группа события (по умолчанию `null`)
 
 Доступные методы базового класса:
 
-- `createGigalog(Model $subject, ?Model $causer = null, ?array $data = null, ?string $group = null): static` — создает запись в таблице логов и возвращает инстанс события
+- `createGigalog(Model $subject, ?Model $causer = null, ?array $data = null): static` — создает запись в таблице логов и возвращает инстанс события
 - `getGigalog(): Gigalog\Models\Gigalog` — возвращает модель лога, связанную с событием
 
 Также в событии можно определить константу версии:
@@ -155,9 +156,68 @@ use App\Gigalogs\OrderCreatedGigalogEvent;
 OrderCreatedGigalogEvent::createGigalog(
     subject: $order,
     causer: auth()->user(),
-    data: ['source' => 'admin-panel'],
-    group: 'orders'
+    data: ['source' => 'admin-panel']
 );
+```
+
+## Группы через `GigalogGroupEnum`
+
+Группа задается в событии через `getGroup()`. Код группы будет автоматически сохранен в поле `group`.
+
+Пример `GigalogGroup.php` как реализации `GigalogGroupEnum`:
+
+```php
+<?php
+
+namespace App\Http\Enums;
+
+use Gigalog\Contracts\GigalogGroupEnum;
+
+enum GigalogGroup: string implements GigalogGroupEnum
+{
+    case DEFAULT = 'default';
+    case ORDERS = 'orders';
+    case USERS = 'users';
+
+    public function getName(): string
+    {
+        return match ($this) {
+            self::DEFAULT => 'Default',
+            self::ORDERS => 'Orders',
+            self::USERS => 'Users',
+        };
+    }
+
+    public function getCode(): string
+    {
+        return $this->value;
+    }
+}
+```
+
+Использование enum в событии:
+
+```php
+<?php
+
+namespace App\Gigalogs;
+
+use App\Http\Enums\GigalogGroup;
+use Gigalog\Abstracts\GigalogEvent;
+use Gigalog\Contracts\GigalogGroupEnum;
+
+class OrderCreatedGigalogEvent extends GigalogEvent
+{
+    public static function getGroup(): ?GigalogGroupEnum
+    {
+        return GigalogGroup::ORDERS;
+    }
+
+    public function getMessage(): string
+    {
+        return 'Заказ создан';
+    }
+}
 ```
 
 ## Пример `GigalogService::list()` в контроллере

@@ -3,9 +3,15 @@
 namespace {{ namespace }};
 
 use Gigalog\Abstracts\GigalogEvent;
+use Gigalog\Contracts\GigalogGroupEnum;
 
 class {{ class }} extends GigalogEvent
 {
+    public static function getGroup(): ?GigalogGroupEnum
+    {
+        return null;
+    }
+
     public function getMessage(): string
     {
         return 'New log';

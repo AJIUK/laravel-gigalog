@@ -2,6 +2,7 @@
 
 namespace Gigalog\Services;
 
+use Gigalog\Abstracts\GigalogEvent;
 use Gigalog\Models\Gigalog;
 use Gigalog\Support\GigalogEagerBag;
 use Illuminate\Database\Eloquent\Model;
@@ -14,9 +15,17 @@ class GigalogService
         Model $subject,
         ?Model $causer = null,
         ?array $data = null,
-        ?string $group = null,
     ): Gigalog
     {
+        if (!class_exists($eventClassName)) {
+            throw new \InvalidArgumentException("Class $eventClassName does not exist");
+        }
+        if (!is_subclass_of($eventClassName, GigalogEvent::class)) {
+            throw new \InvalidArgumentException("Class $eventClassName is not a subclass of GigalogEvent");
+        }
+
+        $group = $eventClassName::getGroup();
+
         return Gigalog::create([
             'class_name' => $eventClassName,
             'version' => $eventClassName::VERSION,
@@ -25,7 +34,7 @@ class GigalogService
             'causer_id' => $causer?->getKey(),
             'causer_type' => $causer?->getMorphClass(),
             'data' => $data,
-            'group' => $group,
+            'group' => $group?->getCode(),
         ]);
     }
 
