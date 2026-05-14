@@ -75,6 +75,11 @@ class Gigalog extends Model
         return $this->morphTo();
     }
 
+    public function setEventClass(string $eventClass): void
+    {
+        $this->_eventClass = $eventClass;
+    }
+
     /**
      * @return class-string<GigalogEvent>|null
      */
