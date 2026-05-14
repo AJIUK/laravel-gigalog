@@ -1,0 +1,50 @@
+<?php
+
+namespace {{ res_gen_namespace }};
+
+use {{ event_namespace }}\{{ event_class }};
+use App\Models\User;
+use Gigalog\Abstracts\GigalogEvent;
+use Gigalog\Abstracts\GigalogResGen;
+use Gigalog\Models\Gigalog;
+use Gigalog\Support\GigalogEager;
+use Gigalog\Support\GigalogEagerBag;
+
+class {{ res_gen_class }} extends GigalogResGen
+{
+    public ?GigalogEager $testUserEager = null;
+
+    public function setEagerBag(Gigalog $gigalog): GigalogEagerBag
+    {
+        $bag = new GigalogEagerBag();
+        $bag->addEager(new GigalogEager(
+            User::class,
+            'id',
+            [$this->gigalog->data['user_id']],
+            $this->testUserEager
+        ));
+        return $bag;
+    }
+
+    public function setMessage(Gigalog $gigalog): string
+    {
+        return "Gigalog ID: {$this->gigalog->id}";
+    }
+
+    public static function prepareSaveData(GigalogEvent $event): ?array
+    {
+        if (!$event instanceof {{ event_class }}) {
+            return null;
+        }
+        return [
+            'test_user_id' => $event->testUser?->getKey(),
+        ];
+    }
+
+    public function setMeta(Gigalog $gigalog): ?array
+    {
+        return [
+            'test_user_id' => $this->testUserEager?->getItems()?->first()?->id,
+        ];
+    }
+}

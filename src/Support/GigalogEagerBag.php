@@ -56,17 +56,22 @@ class GigalogEagerBag
             }
 
             $item = $this->classes[$ownerClass][$ownerKey];
-            $item['values'] = array_merge($item['values'], $eager->getValues());
+            $item['values'] = array_filter(array_merge($item['values'], $eager->getValues()));
             $item['eagers'][] = $eager;
             $this->classes[$ownerClass][$ownerKey] = $item;
         }
 
         foreach ($this->classes as $ownerClass => $ownerKeys) {
             $query = $ownerClass::query();
+            $hasWhere = false;
             foreach ($ownerKeys as $ownerKey => $item) {
+                if (empty($item['values'])) continue;
                 $query->orWhereIn($ownerKey, $item['values']);
+                $hasWhere = true;
             }
-            $items = $query->get();
+
+            $items = $hasWhere ? $query->get() : collect();
+
             foreach ($ownerKeys as $ownerKey => $item) {
                 foreach ($item['eagers'] as $eager) {
                     $eager->setItems($items->whereIn($ownerKey, $item['values']));

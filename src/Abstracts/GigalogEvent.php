@@ -4,87 +4,75 @@ namespace Gigalog\Abstracts;
 
 use Gigalog\Contracts\GigalogGroupEnum;
 use Gigalog\Models\Gigalog;
-use Gigalog\Support\GigalogAction;
-use Gigalog\Support\GigalogEager;
-use Gigalog\Support\GigalogEagerBag;
+use Gigalog\Services\GigalogService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 abstract class GigalogEvent
 {
-    /**
-     * Версия класса события
-     */
     public const string VERSION = '1.0.0';
-
-    /**
-     * Хранилище зависимостей
-     */
-    private ?GigalogEagerBag $_eagerBag = null;
-
-    /**
-     * Конструктор события
-     */
-    final public function __construct(
-        protected Gigalog $gigalog
-    ) {
-        //
-    }
-
-    /**
-     * Получить объект Gigalog
-     */
-    final public function getGigalog(): Gigalog
-    {
-        return $this->gigalog;
-    }
-
-    /**
-     * Создать объект Gigalog
-     */
-    final public static function createGigalog(
-        Model $subject,
-        ?Model $causer = null,
-        ?array $data = null
-    ): self
-    {
-        $service = app(\Gigalog\Services\GigalogService::class);
-        return new static($service->create(static::class, $subject, $causer, $data));
-    }
-
-    /**
-     * Получить коллекцию зависимостей
-     */
-    public function getEagerBag(): GigalogEagerBag
-    {
-        return new GigalogEagerBag();
-    }
-
-    /**
-     * Получить сообщение события
-     */
-    abstract public function getMessage(): string;
-
-    /**
-     * Получить заголовок события
-     */
-    public function getTitle(): ?string
-    {
-        return null;
-    }
-
-    /**
-     * Получить действие события
-     */
-    public function getAction(): ?GigalogAction
-    {
-        return null;
-    }
 
     /**
      * Получить группу события
      */
-    public static function getGroup(): ?GigalogGroupEnum
+    abstract public static function getGroup(): GigalogGroupEnum;
+
+    /**
+     * Получить сообщение события
+     */
+    abstract public static function getMessage(GigalogResGen $resGen): string;
+
+    /**
+     * Получить субъект события
+     */
+    abstract public function getSubject(): Model;
+
+    /**
+     * Получить causer события
+     */
+    abstract public function getCauser(): ?Model;
+
+    /**
+     * Создать объект Gigalog
+     */
+    final public function createGigalog(): Gigalog
     {
-        return null;
+        $service = app(GigalogService::class);
+        $gigalog = $service->create($this);
+        $this->gigalogCreated($gigalog);
+        return $gigalog;
+    }
+
+    /**
+     * Получить код события
+     */
+    final public static function getCode(): string
+    {
+        return collect(explode('\\', static::class))
+            ->map(fn (string $part) => Str::snake($part))
+            ->implode('.');
+    }
+
+    /**
+     * Получить подготовленные данные для сохранения
+     */
+    final public function getPreparedData(): ?array
+    {
+        $resGen = static::prepareResGen(new Gigalog());
+        return $resGen::prepareSaveData($this);
+    }
+
+    /**
+     * Подготовить объект GigalogResGen для загрузки данных и использовании в ресурсе
+     */
+    abstract public static function prepareResGen(Gigalog $gigalog): GigalogResGen;
+
+    /**
+     * Действие после создания Gigalog
+     * Например, можно создать связи между созданным логом и прочими моделями
+     */
+    public function gigalogCreated(Gigalog $gigalog): void
+    {
+        //
     }
 }

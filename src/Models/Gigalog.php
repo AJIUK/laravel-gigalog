@@ -3,6 +3,7 @@
 namespace Gigalog\Models;
 
 use Gigalog\Abstracts\GigalogEvent;
+use Gigalog\Abstracts\GigalogResGen;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
@@ -53,7 +54,8 @@ class Gigalog extends Model
         'data' => 'array',
     ];
 
-    private ?GigalogEvent $_event = null;
+    private ?string $_eventClass = null;
+    private ?GigalogResGen $_resGen = null;
 
     /**
      * Получить имя таблицы из конфига или использовать значение по умолчанию
@@ -73,22 +75,34 @@ class Gigalog extends Model
         return $this->morphTo();
     }
 
-    public function getEvent(): ?GigalogEvent
+    /**
+     * @return class-string<GigalogEvent>|null
+     */
+    public function getEventClass(): ?string
     {
-        if ($this->_event) {
-            return $this->_event;
+        if ($this->_eventClass) {
+            return $this->_eventClass;
         }
 
-        $eventClass = $this->class_name;
-        if (!class_exists($eventClass)) {
-            return null;
-        }
-        if (!is_subclass_of($eventClass, GigalogEvent::class)) {
+        if (!class_exists($this->class_name) || !is_subclass_of($this->class_name, GigalogEvent::class)) {
             return null;
         }
 
-        $this->_event = new $eventClass($this);
+        $this->_eventClass = $this->class_name;
 
-        return $this->_event;
+        return $this->_eventClass;
+    }
+
+    public function getResGen(): ?GigalogResGen
+    {
+        if ($this->_resGen) {
+            return $this->_resGen;
+        }
+        $eventClass = $this->getEventClass();
+        if (!$eventClass) {
+            return null;
+        }
+        $this->_resGen = $eventClass::prepareResGen($this);
+        return $this->_resGen;
     }
 }

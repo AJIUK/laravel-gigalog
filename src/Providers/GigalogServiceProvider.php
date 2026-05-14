@@ -27,7 +27,7 @@ class GigalogServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
-                \Gigalog\Console\MakeGigalogCommand::class,
+                \Gigalog\Console\MakeGigalogEventCommand::class,
             ]);
         }
     }

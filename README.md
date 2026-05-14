@@ -1,6 +1,6 @@
 # Laravel Gigalog
 
-`laravel-gigalog` — библиотека для хранения событийных логов с привязкой к `subject` и `causer` через morph-отношения.
+`laravel-gigalog` — библиотека для событийных логов с morph-связями на `subject` и `causer`.
 
 ## Установка
 
@@ -8,19 +8,17 @@
 composer require ajiuk/laravel-gigalog
 ```
 
-### Подключение Service Provider
-
-Если в проекте не используется package auto-discovery, зарегистрируйте провайдер вручную:
+Если auto-discovery отключен, добавьте провайдер вручную:
 
 ```php
 Gigalog\Providers\GigalogServiceProvider::class,
 ```
 
-Для Laravel 11/12 добавьте его в `bootstrap/providers.php`.
+Для Laravel 11/12 регистрируйте в `bootstrap/providers.php`.
 
-## Публикация файлов пакета
+## Публикация
 
-Опубликовать все ресурсы пакета:
+Опубликовать все ресурсы:
 
 ```bash
 php artisan vendor:publish --tag=gigalog
@@ -38,13 +36,13 @@ php artisan vendor:publish --tag=gigalog-config
 php artisan vendor:publish --tag=gigalog-migrations
 ```
 
-Только API-ресурс `GigalogResource` (из stubs):
+Только ресурс:
 
 ```bash
 php artisan vendor:publish --tag=gigalog-resource
 ```
 
-После публикации миграций выполните:
+После публикации миграций:
 
 ```bash
 php artisan migrate
@@ -52,140 +50,78 @@ php artisan migrate
 
 ## Конфигурация
 
-Файл: `config/gigalog.php`
+Файл `config/gigalog.php`:
 
-- `gigalog_model` — класс модели логов (должен наследоваться от `Gigalog\Models\Gigalog`)
-- `gigalog_table` — имя таблицы для хранения логов
+- `gigalog_model` — класс модели логов (по умолчанию `Gigalog\Models\Gigalog`)
+- `gigalog_table` — имя таблицы (по умолчанию `gigalogs`)
 
-Можно переопределять через переменные окружения:
+Поддерживаемые переменные окружения:
 
 - `GIGALOG_MODEL`
 - `GIGALOG_TABLE`
 
-## Команда `make:gigalog`
+## Генерация событий
 
-Пакет добавляет artisan-команду:
+Пакет добавляет команду:
 
 ```bash
-php artisan make:gigalog OrderCreatedGigalogEvent
+php artisan make:gigalog-event OrderCreatedEvent
 ```
 
-По умолчанию класс создается в namespace `App\Gigalogs`.
+Команда генерирует **два класса**:
+
+- событие в `App\Gigalog\Events\...`
+- res-generator в `App\Gigalog\ResGen\...ResGen`
 
 Опции:
 
-- `--namespace=Front` — добавляет подпапку/namespace, итог: `App\Gigalogs\Front`
-- `--force` — перезаписывает существующий файл
+- `--namespace=Front` — добавляет под-namespace (например, `App\Gigalog\Events\Front`)
+- `--force` (`-f`) — перезаписывает существующие файлы
 
-## Базовый класс `GigalogEvent`
+## Архитектура: `GigalogEvent` + `GigalogResGen`
 
-Все события должны наследоваться от `Gigalog\Abstracts\GigalogEvent`.
+### `GigalogEvent`
 
-Обязательное:
+`Gigalog\Abstracts\GigalogEvent` описывает данные для сохранения и связь с доменной моделью:
 
-- `getMessage(): string` — текст события (обязательно к реализации)
+- `getSubject(): Model` — обязателен
+- `getCauser(): ?Model` — обязателен
+- `prepareResGen(Gigalog $gigalog): GigalogResGen` — обязателен
+- `setGroup(): ?GigalogGroupEnum` — опционально
+- `gigalogCreated(Gigalog $gigalog): void` — опциональный lifecycle-хук
 
-Опционально можно переопределять:
+Также:
 
-- `getTitle(): ?string` — короткий заголовок события (по умолчанию `null`)
-- `getAction(): ?Gigalog\Support\GigalogAction` — действие (кнопка/ссылка) для UI (по умолчанию `null`)
-- `getEagerBag(): Gigalog\Support\GigalogEagerBag` — объявление зависимостей для батч-загрузки связанных данных (по умолчанию пустой `GigalogEagerBag`)
-- `getGroup(): ?Gigalog\Contracts\GigalogGroupEnum` — группа события (по умолчанию `null`)
+- `VERSION` сохраняется в поле `version`
+- `getCode()` строит код события из FQCN (snake_case с разделителем `.`)
+- `createGigalog()` создает запись через `GigalogService`
 
-Доступные методы базового класса:
+### `GigalogResGen`
 
-- `createGigalog(Model $subject, ?Model $causer = null, ?array $data = null): static` — создает запись в таблице логов и возвращает инстанс события
-- `getGigalog(): Gigalog\Models\Gigalog` — возвращает модель лога, связанную с событием
+`Gigalog\Abstracts\GigalogResGen` отвечает за отображение лога и lazy-кеширование:
 
-Также в событии можно определить константу версии:
+- `setEagerBag(Gigalog $gigalog): GigalogEagerBag` — объявление зависимостей для батч-загрузки
+- `setMessage(Gigalog $gigalog): string` — текст события
+- `setMeta(Gigalog $gigalog): ?array` — meta-данные для API
+- `prepareSaveData(GigalogEvent $event): ?array` (static) — данные для поля `data`
+- `setAction(Gigalog $gigalog): ?GigalogAction` — опциональное действие (по умолчанию `null`)
 
-```php
-public const string VERSION = '1.0.0';
-```
-
-Значение сохраняется в поле `version` при создании записи.
-
-### Зачем нужна `version`
-
-`version` помогает безопасно развивать событие во времени без поломки старых логов.
-
-Типовые сценарии:
-
-- изменить шаблон/формат `getMessage()` для новых записей, сохранив корректный рендер старых;
-- поменять структуру `data` и обрабатывать старый/новый формат по `version`;
-- использовать разные стратегии загрузки зависимостей в `getEagerBag()` для разных версий события.
-
-Идея простая: при чтении лога вы смотрите `\$gigalog->version` и выбираете нужную ветку логики для отображения.
-
-## Пример события
+## Пример группы (`GigalogGroupEnum`)
 
 ```php
 <?php
 
-namespace App\Gigalogs;
-
-use Gigalog\Abstracts\GigalogEvent;
-use Gigalog\Support\GigalogAction;
-
-class OrderCreatedGigalogEvent extends GigalogEvent
-{
-    public const string VERSION = '1.0.1';
-
-    public function getMessage(): string
-    {
-        return 'Заказ создан';
-    }
-
-    public function getTitle(): ?string
-    {
-        return 'Новый заказ';
-    }
-
-    public function getAction(): ?GigalogAction
-    {
-        return new GigalogAction('Открыть заказ', '/orders/'.$this->getGigalog()->subject_id);
-    }
-}
-```
-
-## Создание лога из события
-
-```php
-use App\Gigalogs\OrderCreatedGigalogEvent;
-
-OrderCreatedGigalogEvent::createGigalog(
-    subject: $order,
-    causer: auth()->user(),
-    data: ['source' => 'admin-panel']
-);
-```
-
-## Группы через `GigalogGroupEnum`
-
-Группа задается в событии через `getGroup()`. Код группы будет автоматически сохранен в поле `group`.
-
-Пример `GigalogGroup.php` как реализации `GigalogGroupEnum`:
-
-```php
-<?php
-
-namespace App\Http\Enums;
+namespace App\Enums;
 
 use Gigalog\Contracts\GigalogGroupEnum;
 
 enum GigalogGroup: string implements GigalogGroupEnum
 {
-    case DEFAULT = 'default';
     case ORDERS = 'orders';
-    case USERS = 'users';
 
     public function getName(): string
     {
-        return match ($this) {
-            self::DEFAULT => 'Default',
-            self::ORDERS => 'Orders',
-            self::USERS => 'Users',
-        };
+        return 'Orders';
     }
 
     public function getCode(): string
@@ -195,173 +131,165 @@ enum GigalogGroup: string implements GigalogGroupEnum
 }
 ```
 
-Использование enum в событии:
+## Пример сгенерированного события
 
 ```php
 <?php
 
-namespace App\Gigalogs;
+namespace App\Gigalog\Events;
 
-use App\Http\Enums\GigalogGroup;
+use App\Enums\GigalogGroup;
+use App\Gigalog\ResGen\OrderCreatedEventResGen;
 use Gigalog\Abstracts\GigalogEvent;
+use Gigalog\Abstracts\GigalogResGen;
 use Gigalog\Contracts\GigalogGroupEnum;
+use Gigalog\Models\Gigalog;
+use Illuminate\Database\Eloquent\Model;
 
-class OrderCreatedGigalogEvent extends GigalogEvent
+class OrderCreatedEvent extends GigalogEvent
 {
-    public static function getGroup(): ?GigalogGroupEnum
+    public const string VERSION = '1.0.0';
+
+    public function __construct(
+        public readonly Model $subject,
+        public readonly ?Model $causer = null,
+    ) {
+        //
+    }
+
+    public static function setGroup(): ?GigalogGroupEnum
     {
         return GigalogGroup::ORDERS;
     }
 
-    public function getMessage(): string
+    public function getSubject(): Model
     {
-        return 'Заказ создан';
+        return $this->subject;
+    }
+
+    public function getCauser(): ?Model
+    {
+        return $this->causer;
+    }
+
+    public static function prepareResGen(Gigalog $gigalog): GigalogResGen
+    {
+        return new OrderCreatedEventResGen($gigalog);
     }
 }
 ```
 
-## Пример `GigalogService::list()` в контроллере
+## Пример `ResGen`
 
 ```php
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Gigalog\ResGen;
 
-use App\Http\Controllers\Controller;
-use App\Http\Resources\GigalogResource;
-use Gigalog\Services\GigalogService;
-use Illuminate\Http\Request;
-
-class GigalogController extends Controller
-{
-    public function index(Request $request, GigalogService $gigalogService)
-    {
-        $items = $gigalogService->list(
-            subject: $request->user(),
-            causer: null,
-            group: $request->string('group')->toString() ?: null,
-            perPage: (int) $request->integer('per_page', 20),
-        );
-
-        return GigalogResource::collection($items);
-    }
-}
-```
-
-Важно: `GigalogService::list()` внутри себя уже вызывает `loadEagers(...)`, поэтому зависимости из `getEagerBag()` будут загружены автоматически для всех элементов страницы.
-
-## Полный пример `getEagerBag()` в событии
-
-Ниже пример, близкий к реальному использованию:
-
-```php
-<?php
-
-namespace App\Gigalogs;
-
-use App\Models\RealtyObject;
+use App\Gigalog\Events\OrderCreatedEvent;
+use App\Models\User;
 use Gigalog\Abstracts\GigalogEvent;
+use Gigalog\Abstracts\GigalogResGen;
+use Gigalog\Models\Gigalog;
 use Gigalog\Support\GigalogEager;
 use Gigalog\Support\GigalogEagerBag;
 
-class TestLog extends GigalogEvent
+class OrderCreatedEventResGen extends GigalogResGen
 {
-    public ?GigalogEager $objectEager = null;
-    public ?GigalogEager $objectsEager = null;
+    public ?GigalogEager $userEager = null;
 
-    public function getEagerBag(): GigalogEagerBag
+    public function setEagerBag(Gigalog $gigalog): GigalogEagerBag
     {
         $bag = new GigalogEagerBag();
 
         $bag->addEager(new GigalogEager(
-            RealtyObject::class,
+            User::class,
             'id',
-            [$this->gigalog->data['object_id']],
-            $this->objectEager
-        ));
-
-        $bag->addEager(new GigalogEager(
-            RealtyObject::class,
-            'project_id',
-            [$this->gigalog->data['project_id']],
-            $this->objectsEager
+            [$gigalog->data['user_id'] ?? null],
+            $this->userEager
         ));
 
         return $bag;
     }
 
-    public function getMessage(): string
+    public function setMessage(Gigalog $gigalog): string
     {
-        $count = $this->objectsEager?->getItems()?->count() ?? 0;
+        $userName = $this->userEager?->getItems()?->first()?->name ?? 'Unknown';
 
-        return "{$count} objects found";
+        return "Order created by {$userName}";
+    }
+
+    public static function prepareSaveData(GigalogEvent $event): ?array
+    {
+        if (!$event instanceof OrderCreatedEvent) {
+            return null;
+        }
+
+        return [
+            'user_id' => $event->causer?->getKey(),
+        ];
+    }
+
+    public function setMeta(Gigalog $gigalog): ?array
+    {
+        return [
+            'subject_id' => $gigalog->subject_id,
+            'causer_id' => $gigalog->causer_id,
+        ];
     }
 }
 ```
 
-### Для чего нужен параметр `eager` в конструкторе `GigalogEager`
-
-Сигнатура:
+## Создание лога
 
 ```php
-new GigalogEager(
-    string $ownerClass,
-    string $ownerKey,
-    array $values,
-    ?GigalogEager &$eager = null
-)
+use App\Gigalog\Events\OrderCreatedEvent;
+
+$gigalog = (new OrderCreatedEvent(
+    subject: $order,
+    causer: auth()->user(),
+))->createGigalog();
 ```
 
-Последний параметр (`&$eager`) передается **по ссылке** и нужен, чтобы сохранить созданный объект `GigalogEager` в свойство события (например, `$this->objectsEager`), а затем после `load()` получить доступ к загруженным `items`.
+## Получение списка логов
 
-Именно поэтому в примере выше можно использовать:
+`GigalogService::list()`:
 
-- `$this->objectEager?->getItems()`
-- `$this->objectsEager?->getItems()`
+- сортирует по `created_at desc`
+- фильтрует по `subject`, `causer`, `group`
+- подгружает `subject` и `causer`
+- автоматически вызывает `loadEagers()` для текущей страницы
 
-## Ручная загрузка зависимостей через `GigalogEagerBag::load()`
-
-Если вы не используете `GigalogService::list()` (или хотите управлять процессом вручную), можно загрузить зависимости так:
+Пример:
 
 ```php
-use Gigalog\Models\Gigalog;
-use Gigalog\Support\GigalogEagerBag;
-
-$logs = Gigalog::query()
-    ->latest()
-    ->with(['subject', 'causer'])
-    ->limit(20)
-    ->get();
-
-$bag = new GigalogEagerBag();
-
-foreach ($logs as $log) {
-    $event = $log->getEvent();
-    if (!$event) {
-        continue;
-    }
-
-    $bag->mergeBag($event->getEagerBag());
-}
-
-$bag->load();
+$items = $gigalogService->list(
+    subject: $request->user(),
+    causer: null,
+    group: $request->string('group')->toString() ?: null,
+    perPage: (int) $request->integer('per_page', 20),
+);
 ```
 
-После `load()` значения можно доставать из сохраненных eager-объектов внутри события:
+## `GigalogResource` (stub)
 
-```php
-$event = $log->getEvent();
+Публикуемый ресурс `GigalogResource` использует `getResGen()` и возвращает:
 
-$object = $event?->objectEager?->getItems()?->first();     // один объект по id
-$objects = $event?->objectsEager?->getItems() ?? collect(); // коллекция по project_id
-```
+- `id`
+- `code`
+- `group` (`name`, `code`)
+- `meta`
+- `message`
+- `created_at`
+- `updated_at`
 
 ## Модель `Gigalog`
 
-Модель `Gigalog\Models\Gigalog`:
+`Gigalog\Models\Gigalog`:
 
-- хранит имя класса события в `class_name`
-- умеет восстанавливать событие через `getEvent()`
-- содержит morph-связи `subject()` и `causer()`
+- хранит `class_name`, `version`, `group`, `data`
+- имеет morph-связи `subject()` и `causer()`
+- восстанавливает событие через `getEventClass()`
+- строит res-generator через `getResGen()`
 
-Если класс в `class_name` не найден или не наследуется от `GigalogEvent`, `getEvent()` вернет `null`.
+Если `class_name` не существует или не наследуется от `GigalogEvent`, `getEventClass()` вернет `null`.

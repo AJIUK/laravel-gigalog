@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Gigalog\Models\Gigalog;
+use OpenApi\Attributes as OA;
 
 class GigalogResource extends JsonResource
 {
@@ -13,15 +14,18 @@ class GigalogResource extends JsonResource
         /** @var Gigalog $model */
         $model = $this->resource;
 
-        $group = $model->getEvent()?->getGroup();
+        $resGen = $model->getResGen();
+        $group = $resGen->getGroup();
 
         return [
             'id' => $this->id,
+            'code' => $resGen?->getCode(),
             'group' => $group ? [
                 'name' => $group->getName(),
                 'code' => $group->getCode(),
             ] : null,
-            'message' => $model->getEvent()->getMessage(),
+            'meta' => $resGen?->getMeta(),
+            'message' => $resGen?->getMessage(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

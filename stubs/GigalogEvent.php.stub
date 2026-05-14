@@ -1,19 +1,52 @@
 <?php
 
-namespace {{ namespace }};
+namespace {{ event_namespace }};
 
+use {{ res_gen_namespace }}\{{ res_gen_class }};
+use App\Models\User;
 use Gigalog\Abstracts\GigalogEvent;
+use Gigalog\Abstracts\GigalogResGen;
 use Gigalog\Contracts\GigalogGroupEnum;
+use Gigalog\Models\Gigalog;
+use Illuminate\Database\Eloquent\Model;
 
-class {{ class }} extends GigalogEvent
+class {{ event_class}} extends GigalogEvent
 {
-    public static function getGroup(): ?GigalogGroupEnum
+    public function __construct(
+        public readonly Model $subject,
+        public readonly ?Model $causer = null,
+        public readonly ?User $testUser = null,
+    ) {
+        //
+    }
+
+    public static function setGroup(): ?GigalogGroupEnum
     {
         return null;
     }
 
-    public function getMessage(): string
+    public function setPreparedData(): ?array
     {
-        return 'New log';
+        return null;
+    }
+
+    public static function prepareResGen(Gigalog $gigalog): GigalogResGen
+    {
+        return new {{ res_gen_class }}($gigalog);
+    }
+
+    public function getSubject(): Model
+    {
+        return $this->subject;
+    }
+
+    public function getCauser(): ?Model
+    {
+        return $this->causer;
+    }
+
+    public function gigalogCreated(Gigalog $gigalog): void
+    {
+        //
     }
 }
